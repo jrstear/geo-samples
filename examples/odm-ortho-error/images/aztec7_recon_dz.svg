@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" font-family="sans-serif" font-size="12">
+<style>.ax{stroke:#888;fill:none}.grid{stroke:#eee;fill:none}.label{fill:#333}.title{fill:#222;font-weight:bold;font-size:14px}</style>
+<text x="450.0" y="20" text-anchor="middle" class="title">Reconstruction dZ along corridor — GCPs flat (±0.07 ft), no bowl</text>
+<line class="grid" x1="70" y1="316.8181818181818" x2="880" y2="316.8181818181818"/>
+<text x="64" y="320.8181818181818" text-anchor="end" class="label">-5</text>
+<line class="grid" x1="70" y1="290.45454545454544" x2="880" y2="290.45454545454544"/>
+<text x="64" y="294.45454545454544" text-anchor="end" class="label">-4</text>
+<line class="grid" x1="70" y1="264.0909090909091" x2="880" y2="264.0909090909091"/>
+<text x="64" y="268.0909090909091" text-anchor="end" class="label">-3</text>
+<line class="grid" x1="70" y1="237.72727272727275" x2="880" y2="237.72727272727275"/>
+<text x="64" y="241.72727272727275" text-anchor="end" class="label">-2</text>
+<line class="grid" x1="70" y1="211.36363636363637" x2="880" y2="211.36363636363637"/>
+<text x="64" y="215.36363636363637" text-anchor="end" class="label">-1</text>
+<line class="grid" x1="70" y1="185.0" x2="880" y2="185.0"/>
+<text x="64" y="189.0" text-anchor="end" class="label">+0</text>
+<line class="grid" x1="70" y1="158.63636363636363" x2="880" y2="158.63636363636363"/>
+<text x="64" y="162.63636363636363" text-anchor="end" class="label">+1</text>
+<line class="grid" x1="70" y1="132.27272727272728" x2="880" y2="132.27272727272728"/>
+<text x="64" y="136.27272727272728" text-anchor="end" class="label">+2</text>
+<line class="grid" x1="70" y1="105.9090909090909" x2="880" y2="105.9090909090909"/>
+<text x="64" y="109.9090909090909" text-anchor="end" class="label">+3</text>
+<line class="grid" x1="70" y1="79.54545454545453" x2="880" y2="79.54545454545453"/>
+<text x="64" y="83.54545454545453" text-anchor="end" class="label">+4</text>
+<line class="grid" x1="70" y1="53.18181818181819" x2="880" y2="53.18181818181819"/>
+<text x="64" y="57.18181818181819" text-anchor="end" class="label">+5</text>
+<line stroke="black" stroke-opacity="0.5" x1="70" y1="185.0" x2="880" y2="185.0"/>
+<line class="ax" x1="70" y1="40" x2="70" y2="330"/>
+<line class="ax" x1="70" y1="330" x2="880" y2="330"/>
+<text x="20" y="185.0" transform="rotate(-90 20 185.0)" text-anchor="middle" class="label">Reconstruction dZ (ft)</text>
+<text x="450.0" y="365" text-anchor="middle" class="label">UTM Northing (m)</text>
+<line class="ax" x1="70.0" y1="330" x2="70.0" y2="334"/>
+<text x="70.0" y="346" text-anchor="middle" class="label">4085000</text>
+<line class="ax" x1="205.0" y1="330" x2="205.0" y2="334"/>
+<text x="205.0" y="346" text-anchor="middle" class="label">4086000</text>
+<line class="ax" x1="340.0" y1="330" x2="340.0" y2="334"/>
+<text x="340.0" y="346" text-anchor="middle" class="label">4087000</text>
+<line class="ax" x1="475.0" y1="330" x2="475.0" y2="334"/>
+<text x="475.0" y="346" text-anchor="middle" class="label">4088000</text>
+<line class="ax" x1="610.0" y1="330" x2="610.0" y2="334"/>
+<text x="610.0" y="346" text-anchor="middle" class="label">4089000</text>
+<line class="ax" x1="745.0" y1="330" x2="745.0" y2="334"/>
+<text x="745.0" y="346" text-anchor="middle" class="label">4090000</text>
+<line class="ax" x1="880.0" y1="330" x2="880.0" y2="334"/>
+<text x="880.0" y="346" text-anchor="middle" class="label">4091000</text>
+<line x1="475.81" y1="40" x2="475.81" y2="330" stroke="#888" stroke-dasharray="4,3"/>
+<circle cx="91.69450000002514" cy="244.63454545454545" r="3" fill="#888" opacity="0.6"/>
+<circle cx="120.23350000001257" cy="168.76000000000002" r="3" fill="#888" opacity="0.6"/>
+<circle cx="121.58350000001258" cy="200.47545454545454" r="3" fill="#888" opacity="0.6"/>
+<circle cx="163.10950000002515" cy="152.49363636363634" r="3" fill="#888" opacity="0.6"/>
+<circle cx="226.84299999997486" cy="106.11999999999998" r="3" fill="#888" opacity="0.6"/>
+<circle cx="228.40899999998743" cy="142.92363636363638" r="3" fill="#888" opacity="0.6"/>
+<circle cx="263.9275" cy="92.48999999999998" r="3" fill="#888" opacity="0.6"/>
+<circle cx="265.43950000002513" cy="106.09363636363634" r="3" fill="#888" opacity="0.6"/>
+<circle cx="299.0139999999874" cy="153.17909090909092" r="3" fill="#888" opacity="0.6"/>
+<circle cx="336.3820000000252" cy="198.63000000000002" r="3" fill="#888" opacity="0.6"/>
+<circle cx="341.5795000000251" cy="226.9181818181818" r="3" fill="#888" opacity="0.6"/>
+<circle cx="368.4310000000126" cy="207.09272727272727" r="3" fill="#888" opacity="0.6"/>
+<circle cx="432.205" cy="184.55181818181816" r="3" fill="#888" opacity="0.6"/>
+<circle cx="440.4804999999748" cy="224.96727272727273" r="3" fill="#888" opacity="0.6"/>
+<circle cx="463.9704999999749" cy="216.42545454545456" r="3" fill="#888" opacity="0.6"/>
+<circle cx="501.2035000000126" cy="257.0254545454545" r="3" fill="#888" opacity="0.6"/>
+<circle cx="502.09450000002516" cy="196.04636363636362" r="3" fill="#888" opacity="0.6"/>
+<circle cx="531.2814999999874" cy="252.0690909090909" r="3" fill="#888" opacity="0.6"/>
+<circle cx="533.7789999999875" cy="202.74272727272728" r="3" fill="#888" opacity="0.6"/>
+<circle cx="558.5514999999875" cy="218.08636363636361" r="3" fill="#888" opacity="0.6"/>
+<circle cx="619.4364999999874" cy="239.04545454545453" r="3" fill="#888" opacity="0.6"/>
+<circle cx="626.2404999999749" cy="274.7154545454546" r="3" fill="#888" opacity="0.6"/>
+<circle cx="684.2904999999748" cy="272.5272727272727" r="3" fill="#888" opacity="0.6"/>
+<circle cx="684.2904999999748" cy="224.30818181818182" r="3" fill="#888" opacity="0.6"/>
+<circle cx="717.8920000000252" cy="240.36363636363637" r="3" fill="#888" opacity="0.6"/>
+<circle cx="720.0385000000126" cy="174.98181818181817" r="3" fill="#888" opacity="0.6"/>
+<circle cx="767.7610000000126" cy="108.62454545454545" r="3" fill="#888" opacity="0.6"/>
+<circle cx="819.6010000000126" cy="123.70454545454544" r="3" fill="#888" opacity="0.6"/>
+<circle cx="821.7204999999749" cy="47.51363636363635" r="3" fill="#888" opacity="0.6"/>
+<circle cx="861.7210000000125" cy="249.7227272727273" r="3" fill="#888" opacity="0.6"/>
+<circle cx="866.2839999999874" cy="230.60909090909092" r="3" fill="#888" opacity="0.6"/>
+<polygon points="86.86149999998743,179.6609090909091 92.86149999998743,191.6609090909091 80.86149999998743,191.6609090909091" fill="#04a" opacity="0.9"/>
+<polygon points="172.10049999997486,179.68727272727273 178.10049999997486,191.68727272727273 166.10049999997486,191.68727272727273" fill="#04a" opacity="0.9"/>
+<polygon points="300.51250000000005,179.5027272727273 306.51250000000005,191.5027272727273 294.51250000000005,191.5027272727273" fill="#04a" opacity="0.9"/>
+<polygon points="375.3025,178.26363636363635 381.3025,190.26363636363635 369.3025,190.26363636363635" fill="#04a" opacity="0.9"/>
+<polygon points="421.24299999997487,178.39545454545453 427.24299999997487,190.39545454545453 415.24299999997487,190.39545454545453" fill="#04a" opacity="0.9"/>
+<polygon points="456.95049999997485,178.23727272727274 462.95049999997485,190.23727272727274 450.95049999997485,190.23727272727274" fill="#04a" opacity="0.9"/>
+<polygon points="556.8639999999874,179.71363636363637 562.8639999999874,191.71363636363637 550.8639999999874,191.71363636363637" fill="#04a" opacity="0.9"/>
+<polygon points="666.9025,176.20727272727274 672.9025,188.20727272727274 660.9025,188.20727272727274" fill="#04a" opacity="0.9"/>
+<polygon points="766.8564999999875,178.65909090909093 772.8564999999875,190.65909090909093 760.8564999999875,190.65909090909093" fill="#04a" opacity="0.9"/>
+<polygon points="868.1064999999875,179.6609090909091 874.1064999999875,191.6609090909091 862.1064999999875,191.6609090909091" fill="#04a" opacity="0.9"/>
+<rect x="722" y="36" width="160" height="50" fill="white" stroke="#ccc"/>
+<polygon points="735,45 740,55 729,55" fill="#04a"/>
+<text x="750" y="54" class="label">GCP dZ (flat)</text>
+<circle cx="735" cy="68" r="3" fill="#888"/>
+<text x="745" y="72" class="label">CHK dZ (noisy scatter)</text>
+</svg>
