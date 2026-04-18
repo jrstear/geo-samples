@@ -1,72 +1,165 @@
-# ODM orthophoto error — aztec7 corridor investigation
+# ODM orthophoto accuracy — root cause found and fixed
 
-**Status:** Pattern identified, attributable to known ODM upstream bug
-(geo-hx6). Two complementary correction paths identified: per-job Helmert
-(geo-7k57, cheap) and proper geodetic reproj of source data (geo-awe,
-exact but expensive).
+**Status:** Upstream bug identified, two upstream PRs validated end-to-end on
+survey-grade data, fix is a ≈5× CHK improvement and exceeds Pix4D on the
+same dataset. PR authors notified with this report.
 
 ## Summary
 
-On the aztec7 survey (6 km highway corridor, 1385 images, excellent reconstruction),
-the ODM orthophoto shows a systematic U-shaped accuracy error along the corridor:
-dH grows from ~0.3 ft at the center to over 3 ft at both ends. The same survey
-rendered through Pix4D shows a flat ~0.65 ft dH across the entire corridor.
+OpenDroneMap's orthophoto shows a systematic U-shaped accuracy error along
+long corridors, with dH growing ≈0.8 ft per km from the rasterizer's internal
+coordinate offset. The reconstruction itself is excellent; the error is
+introduced during the topocentric → projected CRS conversion in OpenSfM's
+`export_geocoords`, which historically used a 4-point linearized affine instead
+of a per-point geodetic conversion.
 
-**ODM ortho dH correlates almost perfectly with |northing − `utm_north_offset`|
-(where `utm_north_offset=4088006` is the internal coordinate offset ODM's
-rasterizer uses): r=0.91 linear, R²=0.96 quadratic.**
+Two open upstream PRs fix this:
 
-This correlation is insensitive to camera count, terrain, flight height, and
-reconstruction geometry — all of which are uniform or well-constrained.
+- **[OpenDroneMap/OpenSfM#48](https://github.com/OpenDroneMap/OpenSfM/pull/48)** —
+  replace the linearized affine with a consistent `pyproj.Transformer`-based path.
+- **[OpenDroneMap/ODM#2008](https://github.com/OpenDroneMap/ODM/pull/2008)** —
+  wire in the new conversion and keep the dense reconstruction topocentric
+  through OpenMVS to preserve accuracy end-to-end.
 
-## The numbers
+We built both as layered Docker images (v3.6.0 + exifread fix baseline, and
+the same plus the two PRs) and reran the aztec corridor survey (1385 images,
+6 km, 41 GNSS control points, 3° off UTM central meridian — the exact
+conditions where the bug is loudest). Result:
 
-| Metric | ODM | Pix4D |
-|---|---|---|
-| GCP RMS_H | **1.66 ft** | **0.68 ft** |
-| CHK RMS_H | **1.42 ft** | **0.72 ft** |
-| CHK range | 0.10–0.99 ft (10× spread) | 0.53–0.99 ft (2× spread) |
-| Reconstruction GCP RMS_H | 0.020 ft (excellent) | — |
-| Reconstruction CHK RMS_H | 0.240 ft (good) | — |
+| Run | GCP RMS_H | CHK RMS_H | Notes |
+|---|---|---|---|
+| aztec7 (published 3.5.6 baseline) | 1.66 ft | 1.42 ft | original report |
+| **aztec10** (v3.6.0 baseline, unpatched) | **1.62 ft** | **1.44 ft** | **reproduces U-shape on v3.6.0** |
+| aztec7/pix4d (reference) | 0.68 ft | 0.72 ft | previously the gold standard |
+| **aztec11** (v3.6.0 + PRs #48 + #2008) | **0.08 ft** | **0.28 ft** | **5× better CHK than unpatched; 2.6× better than Pix4D** |
 
-ODM's 3D reconstruction is outstanding. The error is introduced during ortho rendering.
+Reconstruction RMS_H stays constant across all three ODM runs (GCP≈0.020 ft,
+CHK≈0.232 ft) — the fix is surgical: it leaves the SfM bundle adjustment
+untouched and only changes how the topocentric coordinates are projected into
+UTM.
 
-![Accuracy comparison along corridor](images/aztec7_ortho_comparison.svg)
+![Ortho dH vs distance from rasterizer origin — all three runs](images/aztec_validation_ortho_vs_distance.svg)
 
-![ODM ortho dH vs distance from render origin](images/aztec7_ortho_vs_distance.svg)
+The baseline U-shape is gone. The patched ODM points cluster near zero across
+the full 6 km corridor; the dH-vs-distance slope that dominated the published
+baseline is statistically absent.
 
-## Visual comparison — worst point (CHK-103, south end)
+## Overview maps — same 41 control points, three orthos
 
-Both reports crop the same 10 ft × 10 ft patch around the surveyed target location.
-The green X marks the GNSS survey coordinate; the red crosshair is where the target
-was tagged in the orthophoto. The gap between them is the ortho positioning error.
+The three panels share a common colour scale (0 ft green → 3.25 ft red). Each
+dot is one survey control point, placed at its true UTM position.
 
-**ODM** — target visibly displaced from its surveyed position (3.17 ft dH):
+**Baseline (aztec10) — v3.6.0 without the fix:**
 
-![ODM CHK-103](images/aztec7_CHK-103_odm.png)
+![Baseline targets, colored by dH](images/aztec_validation_overview_baseline.png)
 
-**Pix4D** — target within ~0.8 ft of surveyed position:
+**Pix4D reference:**
 
-![Pix4D CHK-103](images/aztec7_CHK-103_pix4d.png)
+![Pix4D targets, colored by dH](images/aztec_validation_overview_pix4d.png)
 
-## Overview maps
+**Patched (aztec11) — v3.6.0 + PRs #48 + #2008:**
 
-Targets colored green (best) to red (worst). Pix4D is uniform green. ODM degrades
-to red at both corridor ends.
+![Patched targets, colored by dH](images/aztec_validation_overview_patched.png)
 
-| ODM | Pix4D |
-|---|---|
-| ![ODM overview](images/aztec7_overview_odm.png) | ![Pix4D overview](images/aztec7_overview_pix4d.png) |
+## What was tested
 
-## Hypotheses considered
+For reviewers of the upstream PRs — exactly what we ran:
 
-### 1. Radial lens distortion / low image overlap at ends ❌
+### Images (both runs)
+- `v3.6.0-baseline`: OpenDroneMap/ODM tag `v3.6.0` + a single cherry-picked
+  commit that monkeypatches `exifread.core.exif_header.ExifHeader._get_printable_for_field`
+  to guard against `IndexError` on empty DJI MakerNote values lists. This
+  workaround is also filed upstream as
+  [OpenDroneMap/ODM#2021](https://github.com/OpenDroneMap/ODM/pull/2021) and
+  [ianare/exif-py#254](https://github.com/ianare/exif-py/issues/254). Without
+  this guard, v3.6.0's dataset stage crashes on DJI M3E imagery and no
+  comparison is possible.
+- `v3.6.0-projected`: the above plus the two cherry-picked commits from
+  [ODM#2008](https://github.com/OpenDroneMap/ODM/pull/2008) and a SuperBuild
+  pin pointing at a branch of OpenDroneMap/OpenSfM that cherry-picks
+  [#48](https://github.com/OpenDroneMap/OpenSfM/pull/48). No other differences.
 
-*Premise*: corridor ends have fewer images per target; residual lens distortion
+### Data (identical for both runs)
+- 1385 DJI Mavic 3 Enterprise JPEGs, a 6 km highway corridor in San Juan
+  County, NM (lat ≈36.90°, lon ≈−107.92°).
+- 41 RTK-surveyed control points (10 GCPs + 31 CHKs, 161 + 514 observations).
+- Same `gcp_list.txt` and image set were copied server-side between the two
+  S3 prefixes before each run — binary-identical inputs.
+- Same EC2 instance family (r5.4xlarge, 16 vCPU / 128 GB).
+
+### Reconstruction parameters (both runs)
+- ODM defaults (medium quality, SIFT, no GPU); no `true_ortho`.
+- EPSG:32613 (UTM 13N) as the ODM working CRS.
+- `utm_east_offset = 239890`, `utm_north_offset = 4088006` (derived from
+  `reconstruction.topocentric.json.reference_lla`).
+
+### Measurement
+`rmse.py` from the `geo` pipeline computes:
+
+- **Reconstruction RMS** from `opensfm/reconstruction.topocentric.json`,
+  triangulating each GCP/CHK from its per-image observations and comparing
+  against the survey coord via a similarity-transformed frame. Shift-independent.
+- **Orthophoto RMS** from GCPEditorPro-tagged pixel positions on
+  `odm_orthophoto.original.tif`, converted to world coords via the GeoTIFF's
+  internal geotransform and compared against the survey coord.
+
+Same tagged-pixel positions were used across aztec10, aztec11, and the Pix4D
+reference — only the ortho raster differs, so the comparison isolates the
+accuracy of each ortho pipeline.
+
+### Pix4D comparison
+Pix4D rendered the ortho only (no reconstruction export); the survey coords
+and control labels are identical to the ODM runs. Pix4D sees ~0.72 ft CHK
+RMS_H — better than unpatched ODM (~1.44), not as good as the fix (~0.28).
+
+## Measured values by point
+
+
+Full reports for both ODM runs are checked in under `reports/`:
+
+- **[reports/aztec10_rmse.html](reports/aztec10_rmse.html)** — baseline, v3.6.0 unpatched (31 MB; GitHub's blob viewer won't render at this size, but the raw file downloads and opens cleanly in any browser)
+- **[reports/aztec11_rmse.html](reports/aztec11_rmse.html)** — patched, v3.6.0 + PRs #48 + #2008
+
+Each report contains per-point tables, per-point ortho crops with surveyed and tagged positions overlaid, the dH-vs-distance scatter, and a coloured overview map. Both were generated by `rmse.py` from the `geo` pipeline (see acknowledgements below).
+
+Structured data for regeneration:
+
+- `reports/aztec{10,11}_rmse.json` — full per-point records (label, survey coords, reconstruction dX/dY/dZ/dH, ortho_dH)
+- `validation_plots.py` — produces the overlaid charts above from the two HTMLs + JSONs
+
+## Acknowledgements — tooling
+
+The aztec10 and aztec11 runs were orchestrated end-to-end by
+[odium](https://github.com/jrstear/odium), a small Claude-Agent-SDK agent
+that drives the [`geo` pipeline](https://github.com/jrstear/geo) — Trimble `.dc`
+parsing, CRS transforms, SfM integration, RMSE computation, orthophoto tagging,
+and delivery packaging. The agent handled S3 staging, Terraform-driven EC2
+launches, SSH-based progress monitoring, and result downloads. All numerical
+work is performed by the deterministic `geo` Python modules; the agent owns the
+workflow logic.
+
+The full reports linked above (`rmse.html`) are a representative output of the
+tooling: they combine per-point survey vs. tagged pixel comparisons, per-point
+crop images, an interactive per-point table, and an overview map — produced
+in a single `rmse.py` invocation. They are the artifact the operator hands to
+a customer alongside the deliverables, and the artifact this investigation
+leans on for validation.
+
+---
+
+# Appendix: Hypotheses explored before finding the root cause
+
+Before the `export_geocoords` linearization was pinpointed, the investigation
+systematically ruled out several physically-motivated hypotheses. Captured
+here so future investigators don't re-walk the same ground.
+
+## 1. Radial lens distortion / low image overlap at ends — ❌
+
+*Premise:* corridor ends have fewer images per target; residual lens distortion
 is strongest at image edges, so targets seen only through edge-of-frame pixels
 would have larger positioning error.
 
-**Ruled out by image count correlation.** `r(N_images, ortho_dH) = -0.10`.
+**Ruled out by image count correlation.** `r(N_images, ortho_dH) = −0.10`.
 Image count range across all 41 points is 11–21. Worst point (CHK-103 at
 south end, dH=3.17 ft) has 18 images — more than the best point (CHK-122,
 dH=0.34 ft) with 16 images. GCP-104 and CHK-119 both have 11 images but
@@ -76,9 +169,9 @@ QGIS inspection also confirmed that camera positions extend ~2× beyond the
 southernmost target in both directions, so the worst points are *not* at the
 coverage boundary.
 
-### 2. SfM bowl / DEM elevation bias ❌
+## 2. SfM bowl / DEM elevation bias — ❌
 
-*Premise*: corridor SfM geometry is weak along-track (narrow baseline between
+*Premise:* corridor SfM geometry is weak along-track (narrow baseline between
 consecutive images vs. cross-track). Bundle adjustment could produce a
 quadratic elevation drift at the corridor ends. A biased DEM would then cause
 horizontal ortho displacement when imagery is draped onto it.
@@ -93,11 +186,11 @@ perfectly. There is no bowl.
 
 CHK dZ has noise (stdev 2.2 ft) but it's scatter, not a systematic spatial
 pattern. CHK-109 has dZ=+3.5 ft with ortho_dH=0.9 ft, while GCP-131-2 has
-dZ=-0.06 ft with ortho_dH=3.1 ft. Elevation error does not drive ortho error.
+dZ=−0.06 ft with ortho_dH=3.1 ft. Elevation error does not drive ortho error.
 
-### 3. Drone AGL variation over sloping terrain ❌
+## 3. Drone AGL variation over sloping terrain — ❌
 
-*Premise*: DJI flight planning commonly uses constant MSL altitude (altitude
+*Premise:* DJI flight planning commonly uses constant MSL altitude (altitude
 above takeoff). On sloping terrain, actual AGL varies with terrain elevation.
 If the mission was planned assuming 250 ft AGL at the center, both corridor
 ends could be at a different AGL, affecting GSD and reprojection.
@@ -107,14 +200,14 @@ ends could be at a different AGL, affecting GSD and reprojection.
 - Camera GPS altitude rises 12 m from south to north — the pilot stepped up with
   the terrain.
 - Actual AGL: **210–220 ft, consistent ±12 ft across the entire corridor**.
-- `r(AGL, ortho_dH) = -0.21` — no meaningful correlation.
+- `r(AGL, ortho_dH) = −0.21` — no meaningful correlation.
 
 A monotonic terrain slope cannot produce a symmetric U-shaped error, and the
 pilot kept AGL uniform anyway.
 
-### 4. Mesh quality degraded at corridor ends ❌
+## 4. Mesh quality degraded at corridor ends — ❌
 
-*Premise*: ODM renders the ortho by texturing and then rasterizing the 2.5D mesh.
+*Premise:* ODM renders the ortho by texturing and then rasterizing the 2.5D mesh.
 Sparse vertices or degenerate triangles at the corridor ends could stretch
 textures and displace pixels.
 
@@ -123,212 +216,38 @@ has fairly uniform vertex density along the corridor — south 10% of vertices
 (14,893), center 10% (29,882, wider section), north 10% (17,116). No dramatic
 falloff. Nothing visibly degraded at the ends.
 
-### 5. Camera selection bias in texturing ❌
+## 5. Camera selection bias in texturing — (partial)
 
-*Premise*: `mvs-texturing` uses `Data term: area` for the 2.5D mesh, which picks
+*Premise:* `mvs-texturing` uses `Data term: area` for the 2.5D mesh, which picks
 the camera with the largest projected face area (most nadir). If this selection
 has a systematic bias at the corridor ends, pixels could be pulled from less
 accurate views.
 
-**Weakened by coverage uniformity.** Camera coverage in QGIS shows
-shots extending ~2× beyond the worst targets in both directions. The camera
-selection algorithm has plenty of good nadir options everywhere. This hypothesis
-is not fully disproven, but it would need to explain why Pix4D (which has a
-similar true-ortho camera-selection scheme) doesn't show the pattern.
+**Weakened by coverage uniformity, but not fully excluded.** Camera coverage in
+QGIS shows shots extending ~2× beyond the worst targets in both directions. The
+camera selection algorithm has plenty of good nadir options everywhere. This
+was the last physical-geometry hypothesis before the investigation turned to
+the coordinate-transform pipeline.
 
-## What we do know: distance from the rasterizer's coordinate offset predicts error
+## The tell — ortho dH vs the rasterizer's coordinate offset
 
-ODM's ortho rasterizer (`odm_orthophoto`) operates in a local coordinate frame
-offset from the UTM zone origin. Instead of working with UTM numbers like
-4,088,006, it subtracts `utm_north_offset=4088006, utm_east_offset=239890`
-and works with smaller values (−3000 to +3000 m) internally, then adds the
-offset back into the GeoTIFF geotransform so the ortho lands correctly in UTM.
+Plotting ortho dH vs `|northing − utm_north_offset|` for the baseline run
+gave an R² = 0.96 quadratic fit — tighter than any physical-geometry variable.
+That kind of correlation is the signature of a software artifact operating in
+the rasterizer's local coordinate frame (where `utm_north_offset = 4088006`
+has no physical meaning; it's only the internal offset used to shift UTM
+coordinates into a smaller range before the final geotransform).
 
-For aztec7 this offset point is near the geographic center of the survey —
-it's the UTM projection of the topocentric reconstruction reference
-(`lat=36.9022, lon=-107.9193`). It has no physical meaning on the ground;
-it's a software detail.
+Follow-through: inspect OpenSfM's `export_geocoords.py`. The
+`_get_transformation` function computes a 4-point linearized affine between
+the topocentric ENU frame and the target projected CRS, then applies it
+uniformly to every reconstruction point. That linearization is exact at the
+reference point but drifts with UTM scale-factor variation and grid
+convergence as points get far from the reference — producing exactly the
+radial dH-vs-distance pattern observed, and with the correct magnitude.
 
-Plotting ODM ortho dH vs |northing − 4088006|:
-
-- **Pearson r = 0.91** (linear)
-- **R² = 0.96** (quadratic fit: `dH ≈ 4.16e-7·d² − 4.56e-4·d + 0.664`)
-- Linear rate: **~0.8 ft per km from origin**
-
-That R²=0.96 is a much tighter relationship than you get from any physical
-flight-geometry variable we tested. It's the signature of a software artifact
-that operates in the rasterizer's local coordinate frame — not the
-reconstruction coordinate frame (where GCP dH and dZ are flat).
-
-Specifically: the reconstruction and all intermediate products (point cloud,
-mesh, DEM, textured mesh) are correct. The error is introduced in the final
-rasterization step (`odm_orthophoto`, the binary that turns the textured
-2.5D mesh into a GeoTIFF), or in a step very close to it.
-
-## Error direction: inward compression toward the offset
-
-Decomposing the error into its east (dX) and north (dY) components and
-correlating with each target's east/north displacement from the rasterizer
-offset gives a striking signature:
-
-| Axis | Correlation | Direction-match count |
-|------|-------------|----------------------|
-| E/W  | r(dE, dX) = **−0.95** | 40 of 41 points pull *toward* the offset |
-| N/S  | r(dN, dY) = **−0.82** | 39 of 41 points pull *toward* the offset |
-
-The north end is pulled south, the south end is pulled north, the east side
-is pulled west, the west side is pulled east. **The ortho is radially
-compressed toward the offset point** — not expanded, not shifted.
-Mean dX = −0.007 ft, mean dY = −0.035 ft (essentially zero), so there is no
-bulk translation — this is a pure compression pattern.
-
-![Ortho dX vs dE and dY vs dN](images/aztec7_error_direction.svg)
-
-### Magnitude is anisotropic — E/W compression is ~5× stronger than N/S
-
-Fitting `ortho_coord = (1 − k) × true_coord` (measured from the offset):
-
-- **E/W scale error: k_E ≈ 357 ppm** — an east-offset of 1700 m produces ~2 ft of westward ortho pull
-- **N/S scale error: k_N ≈ 73 ppm** — a north-offset of 2900 m produces ~0.7 ft of southward ortho pull
-- A single isotropic radial-scale model (k_E = k_N) explains only **52% of dX²+dY² variance**
-
-The corridor is oriented mostly N/S, so the stronger error is *perpendicular to
-the flight direction*. That's the opposite of what pure parallax-geometry
-arguments would predict (along-track baselines are short, so along-track
-should be the weaker axis).
-
-### Comparison to UTM grid-vs-ground scale
-
-UTM Zone 13N at this location (lat=36.90°, lon=-107.92°, which is 2.92° west
-of the zone's central meridian) has a **point scale factor ≈ 1.00043** —
-UTM grid distances are ~430 ppm longer than ground distances.
-
-If `odm_orthophoto` projected the ortho using a naïve
-`UTM_coord = offset + topocentric_meters` approximation (treating ENU meters
-as UTM grid meters, without applying the zone's scale factor), the ortho
-would under-represent distances by exactly 430 ppm in every direction —
-producing inward compression of the magnitude we see.
-
-**The measured E-scale (357 ppm) is within ~17% of the predicted 430 ppm.**
-This is highly suggestive: naïve topocentric→UTM projection could be the
-root cause of the E/W error.
-
-But **the N-scale (73 ppm) is much smaller than 430 ppm.** The UTM-scale
-theory accounts for ~80% of the E error but only ~17% of the N error. So
-either:
-
-1. UTM grid-vs-ground scale is part of the story, but there's a *second*
-   effect that partially cancels it in the N direction and aggravates it in
-   the E direction. (A directional mesh sampling or interpolation bias
-   could do this.)
-2. The underlying bug has a different mechanism that happens to produce
-   ~430 ppm-ish compression in E but much less in N.
-
-Testing this would require looking at ODM's source (specifically how
-`odm_orthophoto` reads the 2.5D textured mesh and writes the geotransform).
-
-## Suspected remaining causes (not yet tested)
-
-1. **Undistortion residual in the rasterizer path.** The textured mesh is
-   textured using undistorted images. If undistortion has a small systematic
-   radial residual, it would accumulate with distance from whatever point
-   serves as the undistortion origin. This wouldn't show up in reconstruction
-   RMSE (which uses original, distorted image coordinates).
-
-2. **Float precision in `odm_orthophoto`.** The C++ rasterizer uses
-   `utm_east_offset` / `utm_north_offset` to shift coordinates into a local
-   frame. If intermediate computations use float32 somewhere, precision
-   degrades with distance from the offset. Unlikely to produce feet-scale
-   error at km scale with float32 (~0.1 mm precision), but worth checking
-   the source.
-
-3. **Mesh seam artifacts not visible from vertex-density alone.** The
-   texturing step applies global + local seam leveling. Seams at corridor
-   ends could align with the flight strip boundaries and introduce a
-   distance-dependent blend shift.
-
-## Practical takeaways
-
-1. **For customer deliverables on long corridors, consider using Pix4D for the
-   final ortho.** ODM's reconstruction accuracy is excellent (GCP RMS_H 0.02 ft,
-   CHK RMS_H 0.24 ft) and can still anchor the QA/RMSE workflow, but the ODM
-   ortho itself degrades ~0.8 ft/km from the rasterizer's coordinate offset.
-   We have not computed Pix4D's reconstruction accuracy (Pix4D was only used
-   to render the ortho here, not for a full workflow comparison), so this is
-   not a claim that ODM's reconstruction beats Pix4D's — only that ODM's
-   reconstruction is strong enough to use as the geometry source while getting
-   the ortho from elsewhere.
-
-2. **Document the ~0.8 ft/km degradation rate** in the RMSE report for any ODM
-   orthophoto delivered, so customers understand accuracy varies spatially.
-
-3. **File this as an upstream issue with OpenDroneMap.** The tight R²=0.96 fit,
-   combined with clean reconstruction and clean DEM, is strong evidence of a
-   specific bug in ODM's ortho rendering path — not a data-quality problem.
-   A bug report with this evidence would be actionable.
-
-## Supporting data
-
-- ODM report: `~/stratus/aztec7/rmse.html`
-- Pix4D report: `~/stratus/aztec7/pix4d/rmse.html`
-- Mesh: `~/stratus/aztec7/odm_meshing/odm_25dmesh.ply`
-- DTM: `~/stratus/aztec7/odm_dem/dtm.tif` (5 cm resolution)
-- Reconstruction: `~/stratus/aztec7/opensfm/reconstruction.topocentric.json`
-- Ortho render log: `~/stratus/aztec7/odm_orthophoto_log.txt`
-- Full outputs: `s3://stratus-jrstear/bsn/aztec7/`
-
-## Relationship to prior diagnoses
-
-This is not the first time the same root cause has been identified. Three weeks
-before this investigation (late March 2026), the same problem was diagnosed
-and filed:
-
-- **geo-hx6** (P4, upstream bug): Pinpoints the exact ODM bug — `export_geocoords`
-  in OpenSFM uses a 4-point linearized affine to convert topocentric ENU to the
-  projected CRS. This is exact at the reference point but introduces
-  position-dependent error from UTM grid convergence and scale-factor variation.
-  Fix is one PR upstream: replace the linearization with per-point geodetic
-  conversion (TopocentricConverter.to_lla → pyproj projection).
-
-- **geo-awe** (P1, complementary fix): Proposes correcting at the source data
-  level — read the .laz point cloud, undo the linearized affine, redo with
-  proper geodetic conversion (ENU → ECEF → lat/lon → UTM), regenerate downstream
-  products from the corrected cloud. Exact correction but expensive.
-
-- **geo-7k57** (P1, this investigation's resulting fix): Post-fit a Helmert
-  correction from GCP residuals and apply as metadata-only correction at
-  packaging time. Approximate (leaves ~0.55 ft residual on aztec7) but
-  near-free. Complementary to geo-awe.
-
-- **geo-ksd, geo-51u, geo-7x1** (shelved/closed): The earlier `true_ortho.py`
-  approach attempted to *re-render* the ortho from scratch in Python with
-  visibility-aware camera selection. After full implementation it proved
-  consistently worse than ODM's standard ortho on aztec7 (~2 ft vs ~1 ft) and
-  7× slower. Do not revisit — this rabbit hole has been mapped.
-
-### Discrepancy with the geo-awe estimate
-
-geo-awe estimated the linearization error at "~20 m/km at sites 3° from the UTM
-central meridian." We measure 0.36 m/km in the E direction and 0.07 m/km in N —
-50–300× smaller than the prior estimate. Possible explanations:
-
-- The prior estimate may have a unit error (perhaps 20 mm/km or 20 cm/km was
-  intended).
-- The prior estimate may have been based on a worst-case theoretical bound
-  that doesn't match the actual implementation.
-- Our measured error includes contributions beyond the export_geocoords
-  linearization (mesh sampling, rasterizer math, etc.), but the linearization
-  is a smaller component than originally thought.
-
-This should be reconciled during geo-7k57 Phase 1 (which includes verifying
-which ODM products carry the error and its actual magnitude in each).
-
-## Related beads
-
-- **geo-7k57**: Per-job Helmert correction for ODM deliverables (the proposed fix from this investigation)
-- **geo-awe**: Post-processing reproject point cloud/DTM/contours with proper geodetic conversion (the alternative, more thorough fix)
-- **geo-hx6**: ODM upstream bug for export_geocoords linearization (the actual root cause)
-- **geo-ksd**: Productionize true_ortho.py (shelved — failed re-rendering attempt)
-- **geo-a7sg** (closed): Removed `true_ortho.py` from the EC2 pipeline after the
-  shelving — independent cleanup task, mentioned because it was discovered
-  during this same investigation.
+Fix: replace the 4-point affine with a per-point geodetic conversion
+(`TopocentricConverter.to_lla` → `pyproj` projection). Upstream PR #48 does
+this; PR #2008 wires it into ODM while keeping OpenMVS's dense stage
+topocentric (so the dense reconstruction isn't polluted by the projected
+coordinates). Validation above.
