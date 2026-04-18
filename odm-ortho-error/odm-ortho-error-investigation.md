@@ -26,12 +26,12 @@ the same plus the two PRs) and reran the aztec corridor survey (1385 images,
 6 km, 41 GNSS control points, 3° off UTM central meridian — the exact
 conditions where the bug is loudest). Result:
 
-| Run | GCP RMS_H | CHK RMS_H | Notes |
-|---|---|---|---|
-| aztec7 (published 3.5.6 baseline) | 1.66 ft | 1.42 ft | original report |
-| **aztec10** (v3.6.0 baseline, unpatched) | **1.62 ft** | **1.44 ft** | **reproduces U-shape on v3.6.0** |
-| aztec7/pix4d (reference) | 0.68 ft | 0.72 ft | previously the gold standard |
-| **aztec11** (v3.6.0 + PRs #48 + #2008) | **0.08 ft** | **0.28 ft** | **5× better CHK than unpatched; 2.6× better than Pix4D** |
+| Run                                      | GCP RMS_H   | CHK RMS_H   | Notes                                                    |
+| ---------------------------------------- | ----------- | ----------- | -------------------------------------------------------- |
+| aztec7 (published 3.5.6 baseline)        | 1.66 ft     | 1.42 ft     | original report, where U-shape discovered                |
+| **aztec10** (v3.6.0 baseline, unpatched) | **1.62 ft** | **1.44 ft** | **reproduces U-shape on v3.6.0**                         |
+| aztec7/pix4d (reference)                 | 0.68 ft     | 0.72 ft     | previously the gold standard                             |
+| **aztec11** (v3.6.0 + PRs #48 + #2008)   | **0.08 ft** | **0.28 ft** | **5× better CHK than unpatched; 2.6× better than Pix4D** |
 
 Reconstruction RMS_H stays constant across all three ODM runs (GCP≈0.020 ft,
 CHK≈0.232 ft) — the fix is surgical: it leaves the SfM bundle adjustment
@@ -44,7 +44,7 @@ The baseline U-shape is gone. The patched ODM points cluster near zero across
 the full 6 km corridor; the dH-vs-distance slope that dominated the published
 baseline is statistically absent.
 
-## Overview maps — same 41 control points, three orthos
+## Overview maps — same 41 points (10 GCP, 31 CHK), three orthos
 
 The three panels share a common colour scale (0 ft green → 3.25 ft red). Each
 dot is one survey control point, placed at its true UTM position.
@@ -79,7 +79,7 @@ For reviewers of the upstream PRs — exactly what we ran:
   pin pointing at a branch of OpenDroneMap/OpenSfM that cherry-picks
   [#48](https://github.com/OpenDroneMap/OpenSfM/pull/48). No other differences.
 
-### Data (identical for both runs)
+### Data (identical all runs)
 - 1385 DJI Mavic 3 Enterprise JPEGs, a 6 km highway corridor in San Juan
   County, NM (lat ≈36.90°, lon ≈−107.92°).
 - 41 RTK-surveyed control points (10 GCPs + 31 CHKs, 161 + 514 observations).
@@ -88,7 +88,7 @@ For reviewers of the upstream PRs — exactly what we ran:
 - Same EC2 instance family (r5.4xlarge, 16 vCPU / 128 GB).
 
 ### Reconstruction parameters (both runs)
-- ODM defaults (medium quality, SIFT, no GPU); no `true_ortho`.
+- ODM defaults (medium quality, SIFT, no GPU).
 - EPSG:32613 (UTM 13N) as the ODM working CRS.
 - `utm_east_offset = 239890`, `utm_north_offset = 4088006` (derived from
   `reconstruction.topocentric.json.reference_lla`).

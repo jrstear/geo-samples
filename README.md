@@ -1,15 +1,19 @@
 # geo-samples
 
 Example outputs and sample data for the
-[geo](https://github.com/jrstear/geo) drone-photogrammetry pipeline.
+[geo](https://github.com/jrstear/geo) drone-photogrammetry pipeline and the
+[odium](https://github.com/jrstear/odium) Claude-Agent-SDK orchestrator.
 
 ## Examples
 
-- **[rmse_report.html](https://jrstear.github.io/geo-samples/examples/rmse_report.html)**
-  — a trimmed rmse.py accuracy report from a real survey (aztec7). Contains
-  summary tables, per-point residuals, outlier check, and two annotated ortho
-  crop cards. The remaining 39 crops were removed to keep the file small
-  (1.9 MB vs 32 MB full).
+- **[odm-ortho-error/](odm-ortho-error/odm-ortho-error-investigation.md)** —
+  root-cause investigation of a long-standing ODM orthophoto accuracy bug,
+  end-to-end validation of the two open upstream fixes
+  ([OpenSfM#48](https://github.com/OpenDroneMap/OpenSfM/pull/48) and
+  [ODM#2008](https://github.com/OpenDroneMap/ODM/pull/2008)) on a 1385-image
+  drone survey, and the full `rmse.html` reports for the baseline and patched
+  runs. Patched ODM exceeds Pix4D on the same dataset (CHK RMS_H 0.28 ft vs
+  0.72 ft).
 
 ## Future
 
