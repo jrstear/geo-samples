@@ -6,7 +6,7 @@ Example outputs and sample data for the
 
 ## Examples
 
-- **[odm-ortho-error/](odm-ortho-error/odm-ortho-error-investigation.md)** —
+- **[odm-ortho-error/](odm-ortho-error/)** —
   root-cause investigation of a long-standing ODM orthophoto accuracy bug,
   end-to-end validation of the two open upstream fixes
   ([OpenSfM#48](https://github.com/OpenDroneMap/OpenSfM/pull/48) and
