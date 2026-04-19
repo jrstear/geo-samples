@@ -35,11 +35,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 JOBS = {
-    "baseline": {
-        "label":      "aztec10 — v3.6.0 baseline (unpatched ODM)",
+    "baseline_utm": {
+        "label":      "aztec10 — v3.6.0 baseline, UTM 32613",
         "dir":        Path.home() / "stratus" / "aztec10",
         "json_src":   "self",
+        "survey_crs": "EPSG:32613",
         "color":      "#D1495B",
+    },
+    "baseline_6528": {
+        "label":      "aztec12 — v3.6.0 baseline, state plane 6528",
+        "dir":        Path.home() / "stratus" / "aztec12",
+        "json_src":   "self",
+        "survey_crs": "EPSG:6528",
+        "color":      "#E28E2E",
     },
     "pix4d": {
         "label":      "aztec7/pix4d — reference",
@@ -47,12 +55,14 @@ JOBS = {
         # Pix4D was run in ortho-only mode (no reconstruction JSON). Borrow
         # survey coords from aztec11 — same control points, identical labels.
         "json_src":   Path.home() / "stratus" / "aztec11" / "rmse.json",
+        "survey_crs": "EPSG:32613",
         "color":      "#1F77B4",
     },
-    "patched": {
-        "label":      "aztec11 — v3.6.0 + PRs #48 + #2008 (patched ODM)",
+    "patched_utm": {
+        "label":      "aztec11 — v3.6.0 + PRs #48 + #2008, UTM 32613",
         "dir":        Path.home() / "stratus" / "aztec11",
         "json_src":   "self",
+        "survey_crs": "EPSG:32613",
         "color":      "#2E7D5B",
     },
 }
@@ -116,15 +126,26 @@ def parse_html_per_point(html_path: Path) -> dict[str, dict]:
     return out
 
 
-def merge_with_json(per_point: dict, rmse_json: Path) -> list[dict]:
-    """Add survey_x/y/z + reconstruction dX/dY from rmse.json."""
+def merge_with_json(per_point: dict, rmse_json: Path, survey_crs: str) -> list[dict]:
+    """Add survey_x/y/z + reconstruction dX/dY from rmse.json. Normalises survey
+    coords to UTM 32613 metres so the x-axis |northing - utm_north_offset| is
+    consistent across runs with different working CRSes."""
     data = json.loads(rmse_json.read_text())
+    if survey_crs != "EPSG:32613":
+        import pyproj
+        to_utm = pyproj.Transformer.from_crs(survey_crs, "EPSG:32613", always_xy=True)
+    else:
+        to_utm = None
+
     merged = []
     for role in ("gcp", "chk"):
         for p in data[role]["points"]:
             lab = p["label"]
             if lab not in per_point:
                 continue
+            sx, sy = p["survey_x"], p["survey_y"]
+            if to_utm is not None:
+                sx, sy = to_utm.transform(sx, sy)
             merged.append({
                 "label":     lab,
                 "role":      per_point[lab]["role"],
@@ -132,8 +153,8 @@ def merge_with_json(per_point: dict, rmse_json: Path) -> list[dict]:
                 "ortho_dH":  per_point[lab]["ortho_dH"],
                 "recon_dH":  per_point[lab]["recon_dH"],
                 "recon_dZ":  per_point[lab]["recon_dZ"],
-                "survey_x":  p["survey_x"],
-                "survey_y":  p["survey_y"],
+                "survey_x":  sx,   # UTM 32613 metres regardless of source CRS
+                "survey_y":  sy,
                 "dX":        p.get("dX", 0.0),
                 "dY":        p.get("dY", 0.0),
             })
@@ -221,7 +242,7 @@ def main() -> None:
         json_path = meta["dir"] / "rmse.json" if meta["json_src"] == "self" else meta["json_src"]
         if not json_path.exists():
             raise SystemExit(f"Missing input: {json_path}")
-        meta["points"] = merge_with_json(per_point, json_path)
+        meta["points"] = merge_with_json(per_point, json_path, meta.get("survey_crs", "EPSG:32613"))
         print(f"{key}: parsed {len(meta['points'])} points from {html_path.name} "
               f"(coords from {json_path.name})")
 
