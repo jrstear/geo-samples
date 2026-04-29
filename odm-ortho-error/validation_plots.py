@@ -65,6 +65,13 @@ JOBS = {
         "survey_crs": "EPSG:32613",
         "color":      "#2E7D5B",
     },
+    "patched_6528": {
+        "label":      "aztec13 — v3.6.0 + PRs #48 + #2008, state plane 6528",
+        "dir":        Path.home() / "stratus" / "aztec13",
+        "json_src":   "self",
+        "survey_crs": "EPSG:6528",
+        "color":      "#5B2E7D",
+    },
 }
 
 # UTM 13N offsets from reconstruction.topocentric.json reference_lla (36.9022, -107.9193).
